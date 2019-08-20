@@ -11,7 +11,7 @@ setuptools.setup(
     description="AWS Deployment Utility",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/alphegasolutions/aws_deploy",
+    url="https://github.com/alphegasolutions/aws_tool.git",
     license="MIT",
     packages=setuptools.find_packages(),
     classifiers=[
@@ -19,6 +19,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent"
     ],
+    scripts=['bin/aws-vpc', 'bin/eks-bastion', 'bin/eks-cluster', 'bin/eks-bastion', 'bin/eks-nodes'],
     install_requires=[
         'boto3'
     ]

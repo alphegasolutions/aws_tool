@@ -256,8 +256,6 @@ Resources:
         - !Ref ControlPlaneSecurityGroup
         SubnetIds: !Ref SubnetIds
 
-
-
 Outputs:
 
   ControlPlane:
