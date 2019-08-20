@@ -1,0 +1,6 @@
+[
+	{"ParameterKey": "VpcId","ParameterValue": "vpc-08f57572"},
+	{"ParameterKey": "SubnetIds", "ParameterValue": ""},
+	{"ParameterKey": "ClusterVersion", "ParameterValue": "1.12"},
+	{"ParameterKey": "RemoteAccessCIDR", "ParameterValue": "0.0.0.0/0"}
+]

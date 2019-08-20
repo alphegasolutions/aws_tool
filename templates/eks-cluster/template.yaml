@@ -1,0 +1,291 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EKS Control Plane, Bastion Host and Worker Nodes for Boltlabs Infrastructure'
+
+Metadata:
+  LICENSE: Apache License, Version 2.0
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Network Configuration
+        Parameters:
+          - VpcId
+          - SubnetIds
+
+    ParameterGroups:
+      - Label:
+          default: Cluster Configuration
+        Parameters:
+          - ClusterVersion
+
+    ParameterGroups:
+      - Label:
+          default: Access Configuration
+        Parameters:
+          - RemoteAccessCIDR
+          
+Parameters:
+
+  VpcId:
+    Description: 'The VPC Identifier'
+    Type: 'AWS::EC2::VPC::Id'
+    
+  SubnetIds:
+    Description: 'The list of SubnetIds in the Virtual Private Cloud (VPC)'
+    Type: List<AWS::EC2::Subnet::Id>
+    
+  ClusterVersion:
+    Description: The kubernetes version of the EKS Cluster
+    Type: String
+    Default: '1.13'
+    AllowedValues:
+      - '1.11'
+      - '1.12'
+      - '1.13'
+      
+  RemoteAccessCIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/x
+    Description: Allowed CIDR block for external SSH access to the bastions
+    Default: 0.0.0.0/0
+    Type: String
+        
+Rules:
+  SubnetsInVPC:
+    Assertions:
+      - Assert:
+          'Fn::EachMemberIn':
+            - 'Fn::ValueOfAll':
+                - 'AWS::EC2::Subnet::Id'
+                - VpcId
+            - 'Fn::RefAll': 'AWS::EC2::VPC::Id'
+        AssertDescription: All subnets must exist in the VPC
+
+Resources:
+
+  ControlPlaneSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName}-ControlPlane-SecurityGroup
+      GroupDescription: Cluster communication with worker nodes
+      VpcId: !Ref VpcId
+      
+  ControlPlaneSecurityGroupIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow pods to communicate with the cluster API Server
+      GroupId: !Ref ControlPlaneSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+
+  ControlPlaneSecurityGroupIngress2:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow bastion to communicate with the cluster API Server
+      GroupId: !Ref ControlPlaneSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref BastionSecurityGroup
+
+  ControlPlaneSecurityGroupEgress1:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Allow the cluster control plane to communicate with pods running extension API servers on port 443
+      GroupId: !Ref ControlPlaneSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+
+  ControlPlaneSecurityGroupEgress2:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Allow the cluster control plane to communicate with worker Kubelet and pods
+      GroupId: !Ref ControlPlaneSecurityGroup
+      IpProtocol: tcp
+      FromPort: 1025
+      ToPort: 65535
+      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+
+
+
+  ControlPlaneServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-ControlPlane-ServiceRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+        - arn:aws:iam::aws:policy/AmazonEKSServicePolicy
+
+  BastionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Effect: Allow
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM'
+
+  BastionSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enables SSH Access to Bastion Hosts
+      VpcId: !Ref VpcId
+      
+  BastionSecurityGroupIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BastionSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: !Ref RemoteAccessCIDR
+
+  BastionSecurityGroupIngress2:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BastionSecurityGroup
+      IpProtocol: icmp
+      FromPort: -1
+      ToPort: -1
+      CidrIp: !Ref RemoteAccessCIDR
+
+#  BastionSecurityGroupEgress1:
+#    Type: AWS::EC2::SecurityGroupEgress
+#    Properties:
+#      Description: Allow the bastion instances to access worker nodes via SSH
+#      GroupId: !Ref BastionSecurityGroup
+#      IpProtocol: tcp
+#      FromPort: 22
+#      ToPort: 22
+#      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+
+  NodeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+
+  NodeSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for all nodes in the cluster
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: !Sub kubernetes.io/cluster/${ControlPlane}
+          Value: owned
+
+  NodeSecurityGroupIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow bastion instances access to worker nodes via SSH
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      SourceSecurityGroupId: !Ref BastionSecurityGroup
+
+  NodeSecurityGroupIngress2:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow node to communicate with each other
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: "-1"
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      FromPort: 0
+      ToPort: 65535
+
+  NodeSecurityGroupIngress3:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow pods running extension API servers on port 443 to receive communication from cluster control plane
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref ControlPlaneSecurityGroup
+      FromPort: 443
+      ToPort: 443
+
+  NodeSecurityGroupIngress4:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow worker Kubelets and pods to receive communication from the cluster control plane
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref ControlPlaneSecurityGroup
+      FromPort: 1025
+      ToPort: 65535
+
+
+  ControlPlane:
+    DependsOn: ControlPlaneServiceRole
+    Type: 'AWS::EKS::Cluster'
+    Properties:
+      Name: !Sub ${AWS::StackName}-ControlPlane
+      Version: !Ref ClusterVersion
+      RoleArn: !GetAtt ControlPlaneServiceRole.Arn
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+        - !Ref ControlPlaneSecurityGroup
+        SubnetIds: !Ref SubnetIds
+
+
+
+Outputs:
+
+  ControlPlane:
+    Description: The name of the EKS Cluster
+    Value: !Ref ControlPlane
+ 
+  ControlPlaneSecurityGroup:
+    Description: The security group for the eks control plane
+    Value: !Ref ControlPlaneSecurityGroup
+
+  ServiceRole:
+    Description: The service role for the eks control plane
+    Value: !Ref ControlPlaneServiceRole
+    
+  BastionRole:
+    Description: The service role for the Bastion instances
+    Value: !Ref BastionRole
+    
+  BastionSecurityGroup:
+    Description: The security group for the bastion instances
+    Value: !Ref BastionSecurityGroup
+    
+  NodeRole:
+    Description: The service role for the worker nodes
+    Value: !Ref NodeRole
+  
+  NodeSecurityGroup:
+    Description: The security group for the worker nodes
+    Value: !Ref NodeSecurityGroup
+ 
+    

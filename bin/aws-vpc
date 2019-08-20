@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+
+import aws_tool
+import argparse
+import logging
+import logging.config
+import coloredlogs
+
+import yaml
+
+#logging.basicConfig(filename="logs/vpc.log", level=logging.DEBUG)
+
+#logger = logging.getLogger("botocore")
+#logger.setLevel( logging.DEBUG )
+
+#ch = logging.StreamHandler()
+#ch.setLevel(logging.DEBUG)
+#logger.addHandler(ch)
+
+#logging.config.fileConfig("logging.yaml")
+
+
+with open("logging.yaml", "rt") as log_config:
+    try:
+        config = yaml.safe_load(log_config.read())
+        logging.config.dictConfig(config)
+        coloredlogs.install()
+    except Exception as ex:
+        print(ex)
+        print('Error in Logging Configuration. Using default configs')
+        logging.basicConfig(level=logging.DEBUG)
+        coloredlogs.install(level=logging.DEBUG)
+
+
+ACTION_TYPES = ["CREATE", "LIST", "DELETE", "TEST"]
+
+
+def action_type(action):
+    action = action.upper()
+    if action not in ACTION_TYPES:
+        raise argparse.ArgumentError("{} is not a valid deployment type".format(action))
+
+    return action
+
+
+parser = argparse.ArgumentParser(prog='aws-vpc', description='AWS VPC Tool')
+
+parser.add_argument("--action", help='action type', default="create", type=action_type)
+parser.add_argument("--name", help='Project Name', default="alphega")
+parser.add_argument("--environment", help="Deployment Environment", default="prod")
+parser.add_argument("--artifact-location", help="Location of template files", default="templates/")
+parser.add_argument("--file-system-id", help="EFS File system ID")
+
+aws_tool.AWSSession.add_session_params(parser)
+
+options = parser.parse_args()
+
+aws_session = aws_tool.AWSSession(profile_name=options.profile,
+                                  role_arn=options.role_arn,
+                                  access_key=options.access_key,
+                                  secret_access_key=options.secret_access_key)
+
+stack_name = "{}-vpc-{}".format(options.name, options.environment)
+
+cf_tool = aws_tool.CFStackTool(aws_session)
+
+if options.action == ACTION_TYPES[0]:
+
+    logging.info("Creating VPC")
+
+    template_location = options.artifact_location + "/vpc/template.yaml"
+    parameter_location = options.artifact_location + "/vpc/parameters.json"
+
+    cf_stack = aws_tool.CFStackTemplate(stack_name=stack_name, template_location=template_location, parameter_location=parameter_location)
+    cf_tool.validate(cf_stack)
+
+    result = aws_tool.VPCDeployer.create(cf_stack, cf_tool)
+
+elif options.action == ACTION_TYPES[1]:
+
+    logging.info("Listing VPC")
+
+elif options.action == ACTION_TYPES[2]:
+
+    logging.info("Deleting VPC stack")
+    aws_tool.VPCDeployer.delete(stack_name)

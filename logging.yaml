@@ -1,0 +1,69 @@
+version: 1
+
+formatters:
+  simple:
+    format: '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+
+  error:
+    format: '%(asctime)s - <PID %(process)d:%(processName)s> %(name)s.%(function)s(): %(message)'
+
+handlers:
+
+#  console:
+#    class: logging.StreamHandler
+#    level: DEBUG
+#    formatter: simple
+#    stream: ext://sys.stdout
+
+  awsLogFile:
+    class: logging.handlers.TimedRotatingFileHandler
+    formatter: simple
+    filename: /tmp/aws-sdk.log
+    when: midnight
+
+  errorHandler:
+    class: logging.handlers.TimedRotatingFileHandler
+    level: ERROR
+    formatter: error
+    filename: /tmp/aws-tool-errors.log
+    when: 'midnight'
+    backupCount: 4
+    utc: True
+    encoding: utf8
+
+  criticalHandler:
+    class: logging.handlers.TimedRotatingFileHandler
+    level: CRITICAL
+    formatter: simple
+    filename: /tmp/aws-tool-critical.log
+    when: 'midnight'
+    backupCount: 4
+    utc: True
+    encoding: utf8
+
+
+  deployLogFile:
+    class: logging.handlers.TimedRotatingFileHandler
+    formatter: simple
+    filename: logs/aws-deploy.log
+    when: midnight
+
+
+#root:
+#  level: INFO
+#  handlers: [console]
+#  propagate: yes
+
+loggers:
+
+  botocore:
+    level: DEBUG
+    handlers: [awsLogFile]
+    propagate: yes
+
+
+  aws_tool:
+    level: INFO
+    handlers: [deployLogFile]
+    propagate: no
+

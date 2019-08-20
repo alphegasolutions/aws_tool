@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+
+import aws_tool
+import argparse
+import logging
+
+
+ACTION_TYPES = ["CREATE", "LIST", "DELETE"]
+
+
+def action_type(action):
+    action = action.upper()
+    if action not in ACTION_TYPES:
+        raise argparse.ArgumentError("{} is not a valid deployment type".format(action))
+
+    return action
+
+parser = argparse.ArgumentParser(prog='eks-bastion', description='AWS EKS Bastion instance Tool')
+parser.add_argument("--action", help='action type', default="create", type=action_type)
+parser.add_argument("--vpc-stack", help="Name of the vpc stack to deploy EKS Worker node instances")
+parser.add_argument("--eks-stack", help="Name of the eks cluster stack for the EKS Bastion instances")
+parser.add_argument("--region", help="AWS Region")
+parser.add_argument("--profile", help="AWS session profile")
+parser.add_argument("--role-arn", help="AWS role to assume")
+parser.add_argument("--access-key", help="AWS access key")
+parser.add_argument("--secret-access-key", help="AWS secret key")
+parser.add_argument("--stack-name", help='Stack name')
+parser.add_argument("--artifact-location", help="Artifact location")
+
+options = parser.parse_args()
+
+print(options)
+
+stack_name = "{}-bastion-{}".format(options.name, options.environment)
+
+if options.action == ACTION_TYPES[0]:
+    logging.info("Creating EKS Bastion instance")
+
+elif options.action == ACTION_TYPES[1]:
+    logging.info("Listing EKS Clusters")
+
+elif options.action == ACTION_TYPES[2]:
+    logging.info("Deleting EKS Cluster")

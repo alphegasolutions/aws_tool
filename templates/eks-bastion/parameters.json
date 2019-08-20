@@ -1,0 +1,16 @@
+[
+	{"ParameterKey": "VpcId","ParameterValue": "vpc-08f57572"},
+	{"ParameterKey": "SubnetIds", "ParameterValue": "subnet-d599eafb,subnet-85efebcf"},
+	{"ParameterKey": "ControlPlane", "ParameterValue": ""},
+	{"ParameterKey": "BastionAMIOS", "ParameterValue": "Amazon-Linux-HVM"},
+	{"ParameterKey": "BastionRole", "ParameterValue": ""},
+	{"ParameterKey": "BastionSecurityGroup", "ParameterValue": ""},
+	{"ParameterKey": "BastionBanner", "ParameterValue": "https://aws-quickstart.s3.amazonaws.com/quickstart-linux-bastion/scripts/banner_message.txt"},
+	{"ParameterKey": "InstanceType", "ParameterValue": "t2.medium"},
+	{"ParameterKey": "KeyPairName", "ParameterValue": "AlphegaSolutionsKP"},
+	{"ParameterKey": "NumBastionHosts", "ParameterValue": "1"},
+	{"ParameterKey": "EnvironmentVariables", "ParameterValue": ""},
+	{"ParameterKey": "RootVolumeSize", "ParameterValue": "10"},
+	{"ParameterKey": "QSS3BucketName", "ParameterValue": "aws-quickstart"},
+	{"ParameterKey": "QSS3KeyPrefix", "ParameterValue": "quickstart-linux-bastion/"}
+]

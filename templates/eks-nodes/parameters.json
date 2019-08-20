@@ -1,0 +1,16 @@
+[
+	{"ParameterKey": "VpcId","ParameterValue": "vpc-08f57572"},
+	{"ParameterKey": "SubnetIds", "ParameterValue": ["subnet-8f91e0d3","subnet-48b0c42f"]},	
+	{"ParameterKey": "ControlPlane", "ParameterValue": ""},
+	{"ParameterKey": "ClusterVersion", "ParameterValue": "1.12"},
+	{"ParameterKey": "ControlPlaneSecurityGroup", "ParameterValue": ""},
+	{"ParameterKey": "NodeRole", "ParameterValue": ""},
+	{"ParameterKey": "NodeSecurityGroup", "ParameterValue": ""},
+	{"ParameterKey": "KeyPairName", "ParameterValue": "AlphegaSolutionsKP"},
+	{"ParameterKey": "InstanceType", "ParameterValue": "t3.medium"},
+	{"ParameterKey": "AutoScalingGroupMinSize", "ParameterValue": "1"},
+	{"ParameterKey": "AutoScalingGroupMaxSize", "ParameterValue": "3"},
+	{"ParameterKey": "AutoScalingGroupDesiredCapacity", "ParameterValue": "2"},
+	{"ParameterKey": "NodeVolumeSize", "ParameterValue": "20"},
+	{"ParameterKey": "BootstrapArguments", "ParameterValue": ""}
+]
