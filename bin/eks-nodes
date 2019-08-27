@@ -3,41 +3,47 @@
 import aws_tool
 import argparse
 import logging
+import traceback
 
+logger = logging.getLogger("aws_tool.eks-nodes")
 
-ACTION_TYPES = ["CREATE", "LIST", "DELETE"]
-
-
-def action_type(action):
-    action = action.upper()
-    if action not in ACTION_TYPES:
-        raise argparse.ArgumentError("{} is not a valid deployment type".format(action))
-
-    return action
-
-parser = argparse.ArgumentParser(prog='eks-node', description='AWS EKS Worker Node Tool')
-parser.add_argument("--action", help='action type', default="create", type=action_type)
-parser.add_argument("--vpc-stack", help="Name of the vpc stack to deploy EKS Worker node instances")
-parser.add_argument("--eks-stack", help="Name of the eks cluster stack for the EKS Worker node instances")
-parser.add_argument("--region", help="AWS Region")
-parser.add_argument("--profile", help="AWS session profile")
-parser.add_argument("--role-arn", help="AWS role to assume")
-parser.add_argument("--access-key", help="AWS access key")
-parser.add_argument("--secret-access-key", help="AWS secret key")
-parser.add_argument("--stack-name", help='Stack name')
-parser.add_argument("--artifact-location", help="Artifact location")
+parser = argparse.ArgumentParser(prog='eks-nodes', description='AWS EKS Bastion Worker Node Deployment Tool')
+aws_tool.EKSWorkerNodeDeployer.set_arg_options(parser)
 
 options = parser.parse_args()
 
-stack_name = "{}-nodes-{}".format(options.name, options.environment)
+logger.info("command line arguments: {}".format(options) )
 
-print(options)
+aws_tool.EKSClusterDeployer.init(options)
+stack_name = aws_tool.EKSWorkerNodeDeployer.get_stack_name(options)
 
-if options.action == ACTION_TYPES[0]:
-    logging.info("Creating EKS Cluster")
 
-elif options.action == ACTION_TYPES[1]:
-    logging.info("Listing EKS Clusters")
+if options.action == aws_tool.EKSWorkerNodeDeployer.CREATE:
 
-elif options.action == ACTION_TYPES[2]:
-    logging.info("Deleting EKS Cluster")
+    try:
+        logging.info("Creating EKS Worker Node Stack: {}".format(stack_name))
+        template_location = options.artifact_location + "/eks-nodes/template.yaml"
+        parameter_location = options.artifact_location + "/eks-nodes/parameters.json"
+
+        cf_stack = aws_tool.CFStackTemplate(stack_name=stack_name, template_location=template_location,
+                                            parameter_location=parameter_location)
+        aws_tool.EKSWorkerNodeDeployer.set_stack_options(options, cf_stack)
+
+        result = aws_tool.EKSWorkerNodeDeployer.create_node(cf_stack, options.vpc_stack, options.eks_stack)
+        logging.info(result)
+
+    except Exception as ex:
+        traceback.print_exc()
+
+elif options.action == aws_tool.EKSWorkerNodeDeployer.DELETE:
+    logging.info("Deleting EKS Worker Node Stack: {}".format(stack_name))
+    aws_tool.EKSWorkerNodeDeployer.delete_node(stack_name)
+
+elif options.action == aws_tool.EKSWorkerNodeDeployer.LIST:
+
+    logger.info("Listing EKS Worker Node Stacks")
+    aws_tool.EKSWorkerNodeDeployer.list_nodes()
+
+elif options.action == aws_tool.EKSWorkerNodeDeployer.FIND:
+    logger.info("Finding EKS Worker Node Stack: " + stack_name)
+    aws_tool.EKSWorkerNodeDeployer.find_node(stack_name)

@@ -77,13 +77,11 @@ class CFStackTemplate(object):
         self.__tags = []
 
     def set_parameter(self, key, value):
-#        Found = False
         for param in self.__params:
             if param["ParameterKey"] == key:
                 param["ParameterValue"] = value
                 return
 
- #       if not Found:
         self.__params.append({"ParameterKey": key, "ParameterValue": value})
 
     def add_capability(self, capability):
@@ -167,29 +165,27 @@ class CFStackTool(object):
     def get_stack(self, stack_name):
 
         response = _get_stack_info(self.__cf, stack_name)
-        print(response)
-        for stack in response['Stacks']:
-            if stack_name == stack['StackName']:
-                return CFStackResult(stack)
+        if 'Stacks' in response.keys():
+            for stack in response['Stacks']:
+                if stack_name == stack['StackName']:
+                    return CFStackResult(stack)
 
-        raise Exception("Stack with name {} not found".format(stack_name))
+        return None
 
     def validate(self, stack=CFStackTemplate):
 
         response = self.__cf.validate_template(TemplateBody=stack.template_body)
-#        print(response)
+        print(response)
 
         parameters = []
         for param in response["Parameters"]:
-            parameters.append({"ParameterKey": param["ParameterKey"], "ParameterValue": param["DefaultValue"]})
+            if "DefaultValue" in param.keys():
+                parameters.append({"ParameterKey": param["ParameterKey"], "ParameterValue": param["DefaultValue"]})
 
         capabilities = response["Capabilities"]
 
         for capability in capabilities:
             stack.add_capability(capability)
-
-        #print(parameters)
-        #print(capabilities)
 
         return parameters, capabilities
 
@@ -237,6 +233,10 @@ class CFStackTool(object):
             else:
                 logging.error(error_message)
                 raise ex
+        except botocore.exceptions.WaiterError as ex:
+            logging.info("Failed to create stack: " + str(ex))
+            raise Exception("Failed to create stack")
+
         else:
             stacks = self.__cf.describe_stacks(StackName=stack_result['StackId'])
             logging.info(stacks)
@@ -282,32 +282,16 @@ def _get_stack_list(cf):
 
 def _get_stack_info(cf, stack_name):
     try:
-        response = cf.describe_stacks(StackName=stack_name)
-        return response
-#        cf_logger.info(response)
-
-        info = {}
-#        info['Outputs'] = {}
-
-        # for stack in response['Stacks']:
-        #     if stack_name == stack['StackName']:
-        #         info['StackId'] = stack['StackId']
-        #         info['StackName'] = stack['StackName']
-        #         info['CreationTime'] = stack['CreationTime']
-        #         # info['LastUpdatedTime'] = stack['LastUpdatedTime']
-        #         info['StackStatus'] = stack['StackStatus']
-        #
-        #         outputs = info['Outputs']
-        #         for output in stack['Outputs']:
-        #             outputs[output['OutputKey']] = output['OutputValue']
-        #
-        #         return info
-
+        return cf.describe_stacks(StackName=stack_name)
     except Exception as ex:
-        logging.error("Error while describing stack: " + str(ex))
-        raise ex
-    else:
-        raise Exception("Stack {} does not exist".format(stack_name))
+
+        if isinstance(ex, botocore.exceptions.ClientError):
+            logging.error(ex.response)
+
+        if ex.response['Error']['Code'] not in ['ValidationError']:
+            logging.error("Error while describing stack: " + str(ex))
+            raise ex
+        return {}
 
 
 def _cf_stack_exists(cf, stack_name):
@@ -333,7 +317,7 @@ def _delete_cf_stack(cf, stack_name):
         logging.info('waiting for stack {} to be deleted'.format(stack_name))
 
         waiter.wait(StackName=stack_name)
-
+        logging.info("stack deletion completed!")
     except Exception as ex:
         logging.error("Error while deleting stack: " + str(ex))
         raise ex

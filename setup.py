@@ -19,7 +19,9 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent"
     ],
-    scripts=['bin/aws-vpc', 'bin/eks-bastion', 'bin/eks-cluster', 'bin/eks-bastion', 'bin/eks-nodes'],
+    scripts=['bin/eks-vpc', 'bin/eks-bastion', 'bin/eks-cluster', 'bin/eks-bastion', 'bin/eks-nodes'],
+    package_data={'aws_tool': ['../templates/**/**']},
+    include_package_data=True,
     install_requires=[
         'boto3'
     ]

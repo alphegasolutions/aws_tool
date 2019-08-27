@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+
+import aws_tool
+import argparse
+import logging
+#import coloredlogs
+import os
+
+#coloredlogs.install()
+
+logger = logging.getLogger("aws_tool.eks-vpc")
+logger.setLevel(logging.DEBUG)
+
+parser = argparse.ArgumentParser(prog='eks-vpc', description='AWS VPC Tool')
+aws_tool.VPCDeployer.set_arg_options(parser)
+options = parser.parse_args()
+
+logger.debug("command line arguments: {}".format(options) )
+
+# add validation logic
+# name and environment required
+
+aws_tool.VPCDeployer.init(options)
+stack_name = aws_tool.VPCDeployer.get_stack_name(options)
+
+if options.action == aws_tool.VPCDeployer.CREATE:
+
+    print(os.path.abspath(options.artifact_location))
+    template_location = options.artifact_location + "/eks-vpc/template.yaml"
+    parameter_location = options.artifact_location + "/eks-vpc/parameters.json"
+
+    logger.info("Creating VPC Stack: {} based on cloudformation template @ {} and parameters @ {}".format(
+        stack_name, template_location, parameter_location))
+
+    cf_stack = aws_tool.CFStackTemplate(stack_name=stack_name, template_location=template_location,
+                                        parameter_location=parameter_location)
+    aws_tool.VPCDeployer.set_stack_options(options, cf_stack)
+
+    result = aws_tool.VPCDeployer.create_vpc(cf_stack)
+    logging.info(result)
+
+elif options.action == aws_tool.VPCDeployer.LIST:
+
+    logger.info("Listing VPC")
+    aws_tool.VPCDeployer.list_vpc()
+
+elif options.action == aws_tool.VPCDeployer.FIND:
+    logger.info("Finding Stack: " + stack_name)
+    aws_tool.VPCDeployer.find_vpc(stack_name)
+
+elif options.action == aws_tool.VPCDeployer.DELETE:
+
+    logger.info("Deleting VPC stack")
+    aws_tool.VPCDeployer.delete_vpc(stack_name)

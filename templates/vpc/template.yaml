@@ -54,7 +54,7 @@ Metadata:
           - PrivateSubnet02Block
           - fileSystemID
 
-Condition:
+Conditions:
   CreateFileSystem: !Equals
     - !Ref fileSystemID
     - ''
@@ -348,8 +348,7 @@ Resources:
     Type: 'AWS::EFS::MountTarget'
     Properties:
       SubnetId: !Ref PrivateSubnet01
-      FileSystemId:
-        - !If
+      FileSystemId: !If
           - CreateFileSystem
           - !Ref k8sFileSystem
           - !Ref fileSystemID
@@ -360,8 +359,7 @@ Resources:
     Type: 'AWS::EFS::MountTarget'
     Properties:
       SubnetId: !Ref PrivateSubnet02
-      FileSystemId:
-        - !If
+      FileSystemId: !If
           - CreateFileSystem
           - !Ref k8sFileSystem
           - !Ref fileSystemID
@@ -389,8 +387,11 @@ Outputs:
  
   EFSId:
     Description: File System ID for the EFS Storage Block
-    Value: !Ref k8sFileSystem
- 
+    Value: !If
+        - CreateFileSystem
+        - !Ref k8sFileSystem
+        - !Ref fileSystemID
+
  
  
  

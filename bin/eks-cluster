@@ -3,55 +3,52 @@
 import aws_tool
 import argparse
 import logging
+import traceback
 
-
-ACTION_TYPES = ["CREATE", "LIST", "DELETE"]
-
-
-def action_type(action):
-    action = action.upper()
-    if action not in ACTION_TYPES:
-        raise argparse.ArgumentError("{} is not a valid deployment type".format(action))
-
-    return action
+logger = logging.getLogger("aws_tool.eks-cluster")
 
 parser = argparse.ArgumentParser(prog='eks-cluster', description='AWS EKS Tool')
-parser.add_argument("--action", help='action type', default="create", type=action_type)
-parser.add_argument("--cluster-version", help="EKS Cluster version")
-parser.add_argument("--vpc-stack", help="Name of the vpc stack to deploy EKS cluster")
-parser.add_argument("--region", help="AWS Region")
-
-aws_tool.AWSSession.add_session_params(parser)
-
+aws_tool.EKSClusterDeployer.set_arg_options(parser)
 
 options = parser.parse_args()
 
-aws_session = aws_tool.AWSSession(profile_name=options.profile,
-                                  role_arn=options.role_arn,
-                                  access_key=options.access_key,
-                                  secret_access_key=options.secret_access_key)
+logger.info("command line arguments: {}".format(options) )
 
-stack_name = "{}-eks-{}".format(options.name, options.environment)
+aws_tool.EKSClusterDeployer.init(options)
+stack_name = aws_tool.EKSClusterDeployer.get_stack_name(options)
 
-cf_tool = aws_tool.CFStackTool(aws_session)
-deployer = aws_tool.EKSClusterDeployer()
+if options.action == aws_tool.EKSClusterDeployer.CREATE:
 
-if options.action == ACTION_TYPES[0]:
-    logging.info("Creating EKS Cluster")
+    try:
+        logging.info("Creating EKS Cluster: {}".format(stack_name))
+        template_location = options.artifact_location + "/eks-cluster/template.yaml"
+        parameter_location = options.artifact_location + "/eks-cluster/parameters.json"
 
-    template_location = options.artifact_location + "/eks-cluster/template.yaml"
-    parameter_location = options.artifact_location + "/eks-cluster/parameters.json"
+        cf_stack = aws_tool.CFStackTemplate(stack_name=stack_name, template_location=template_location,
+                                            parameter_location=parameter_location)
+        aws_tool.EKSClusterDeployer.set_stack_options(options, cf_stack)
 
-    cf_stack = aws_tool.CFStackTemplate(stack_name=stack_name, template_location=template_location, parameter_location=parameter_location)
-    cf_stack.set_parameter("ClusterVersion", options.cluster_version)
+        result = aws_tool.EKSClusterDeployer.create_cluster(cf_stack, options.vpc_stack)
+        logging.info(result)
 
-    cf_tool.validate(cf_stack)
+#        if options.private_access is not None or options.public_access is not None:
+#            logger.info("setting cluster access")
 
-    aws_tool.EKSClusterDeployer.create(cf_stack, options.vpc_stack, cf_tool)
+#        if options.enable_logging is not None:
+#            logger.info("setting cluster logs")
 
+    except Exception as ex:
+        traceback.print_exc()
 
-elif options.action == ACTION_TYPES[1]:
-    logging.info("Listing EKS Clusters")
+elif options.action == aws_tool.EKSClusterDeployer.DELETE:
+    logging.info("Deleting EKS Cluster: {}".format(stack_name))
+    aws_tool.EKSClusterDeployer.delete_cluster(stack_name)
 
-elif options.action == ACTION_TYPES[2]:
-    logging.info("Deleting EKS Cluster")
+elif options.action == aws_tool.EKSClusterDeployer.LIST:
+
+    logger.info("Listing EKS Clusters")
+    aws_tool.EKSClusterDeployer.list_clusters()
+
+elif options.action == aws_tool.EKSClusterDeployer.FIND:
+    logger.info("Finding EKS Cluster Stack: " + stack_name)
+    aws_tool.EKSClusterDeployer.find_cluster(stack_name)

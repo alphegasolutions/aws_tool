@@ -1,0 +1,10 @@
+include aws_tool/logging.yaml
+include LICENSE
+include templates/vpc/template.yaml
+include templates/vpc/parameters.json
+include templates/eks-cluster/template.yaml
+include templates/eks-cluster/parameters.json
+include templates/eks-bastion/template.yaml
+include templates/eks-bastion/parameters.json
+include templates/eks-nodes/template.yaml
+include templates/eks-nodes/parameters.json
